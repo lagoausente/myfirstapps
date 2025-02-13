@@ -1,59 +1,119 @@
 import os
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
+from tkinter import simpledialog
 
+# Función para renombrar los archivos en el directorio seleccionado
 def renombrar_archivos():
-    # Obtener los directorios seleccionados por el usuario
-    origen_dir = origen_var.get()
-    destino_dir = destino_var.get()
+    # Obtener el directorio desde el que se quiere renombrar los archivos
+    carpeta = filedialog.askdirectory(title="Selecciona la carpeta con los archivos")
     
-    # Renombrar los archivos dentro del directorio origen y moverlos al destino
+    # Comprobar si se seleccionó una carpeta
+    if not carpeta:
+        return
+    
+    # Obtener las opciones de renombrado
+    prefijo = prefijo_entry.get()
+    sufijo = sufijo_entry.get()
+    reemplazar_nombre = reemplazar_var.get()
+    tipos_archivo = tipos_archivo_entry.get().split(",")  # Separa por comas
+    
     try:
-        for archivo in os.listdir(origen_dir):
-            if archivo.endswith(".xlsx"):  # Solo renombrar archivos .xlsx
-                nuevo_nombre = prefijo_var.get() + archivo + sufijo_var.get()
-                os.rename(os.path.join(origen_dir, archivo), os.path.join(destino_dir, nuevo_nombre))
-        status_label.config(text="Archivos renombrados correctamente")
+        archivos_a_renombrar = []
+        # Recorrer todos los archivos de la carpeta
+        for archivo in os.listdir(carpeta):
+            if any(archivo.endswith(ext.strip()) for ext in tipos_archivo):
+                # Si es un archivo compatible
+                archivo_antiguo = os.path.join(carpeta, archivo)
+                
+                if reemplazar_nombre:
+                    # Si se reemplaza el nombre completamente
+                    nombre_nuevo = prefijo + archivo.split('.')[0] + sufijo + "." + archivo.split('.')[-1]
+                else:
+                    # Si no se reemplaza, solo se agrega prefijo/sufijo
+                    nombre_nuevo = prefijo + archivo + sufijo
+
+                archivos_a_renombrar.append((archivo, nombre_nuevo))
+
+        # Mostrar vista previa de los cambios
+        mostrar_vista_previa(archivos_a_renombrar)
+
     except Exception as e:
-        status_label.config(text=f"Error: {str(e)}")
+        messagebox.showerror("Error", f"Hubo un error al procesar los archivos: {e}")
 
-def seleccionar_origen():
-    origen_dir = filedialog.askdirectory(title="Selecciona la carpeta de origen")
-    origen_var.set(origen_dir)
 
-def seleccionar_destino():
-    destino_dir = filedialog.askdirectory(title="Selecciona la carpeta de destino")
-    destino_var.set(destino_dir)
+# Función para mostrar la vista previa de los cambios
+def mostrar_vista_previa(archivos):
+    # Crear una nueva ventana para mostrar la vista previa
+    vista_previa_ventana = tk.Toplevel(ventana)
+    vista_previa_ventana.title("Vista Previa de Renombrado")
+    
+    # Crear un scroll
+    scroll = tk.Scrollbar(vista_previa_ventana)
+    scroll.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    lista_archivos = tk.Listbox(vista_previa_ventana, width=80, height=15, yscrollcommand=scroll.set)
+    lista_archivos.pack(pady=10)
+    
+    # Agregar los archivos a la lista
+    for archivo_antiguo, archivo_nuevo in archivos:
+        lista_archivos.insert(tk.END, f"{archivo_antiguo} --> {archivo_nuevo}")
 
-# Crear la ventana principal
+    # Botón para confirmar el renombrado
+    confirmar_button = tk.Button(vista_previa_ventana, text="Confirmar Renombrado", command=lambda: confirmar_renombrado(archivos))
+    confirmar_button.pack(pady=10)
+
+    scroll.config(command=lista_archivos.yview)
+
+
+# Función para confirmar el renombrado de los archivos
+def confirmar_renombrado(archivos):
+    carpeta = filedialog.askdirectory(title="Selecciona la carpeta con los archivos")
+    
+    try:
+        for archivo_antiguo, archivo_nuevo in archivos:
+            ruta_antigua = os.path.join(carpeta, archivo_antiguo)
+            ruta_nueva = os.path.join(carpeta, archivo_nuevo)
+            os.rename(ruta_antigua, ruta_nueva)
+
+        messagebox.showinfo("Renombrado", "Los archivos se han renombrado con éxito.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Hubo un error al renombrar los archivos: {e}")
+
+
+# Crear ventana principal de la aplicación
 ventana = tk.Tk()
-ventana.title("Renombrador de Archivos")
+ventana.title("Renombrar Archivos - Versión Avanzada")
+ventana.geometry("500x350")
 
-# Variables
-origen_var = tk.StringVar()
-destino_var = tk.StringVar()
-prefijo_var = tk.StringVar()
-sufijo_var = tk.StringVar()
+# Etiqueta y campo de entrada para el prefijo
+prefijo_label = tk.Label(ventana, text="Prefijo:")
+prefijo_label.pack(pady=5)
+prefijo_entry = tk.Entry(ventana, width=40)
+prefijo_entry.pack(pady=5)
 
-# Crear la interfaz gráfica
-tk.Label(ventana, text="Carpeta de origen:").grid(row=0, column=0)
-tk.Entry(ventana, textvariable=origen_var, width=40).grid(row=0, column=1)
-tk.Button(ventana, text="Seleccionar", command=seleccionar_origen).grid(row=0, column=2)
+# Etiqueta y campo de entrada para el sufijo
+sufijo_label = tk.Label(ventana, text="Sufijo:")
+sufijo_label.pack(pady=5)
+sufijo_entry = tk.Entry(ventana, width=40)
+sufijo_entry.pack(pady=5)
 
-tk.Label(ventana, text="Carpeta de destino:").grid(row=1, column=0)
-tk.Entry(ventana, textvariable=destino_var, width=40).grid(row=1, column=1)
-tk.Button(ventana, text="Seleccionar", command=seleccionar_destino).grid(row=1, column=2)
+# Opción para reemplazar completamente el nombre del archivo
+reemplazar_var = tk.BooleanVar()
+reemplazar_check = tk.Checkbutton(ventana, text="Reemplazar nombre completamente", variable=reemplazar_var)
+reemplazar_check.pack(pady=5)
 
-tk.Label(ventana, text="Prefijo:").grid(row=2, column=0)
-tk.Entry(ventana, textvariable=prefijo_var, width=40).grid(row=2, column=1)
+# Etiqueta y campo de entrada para los tipos de archivo
+tipos_archivo_label = tk.Label(ventana, text="Tipos de archivo (separados por coma):")
+tipos_archivo_label.pack(pady=5)
+tipos_archivo_entry = tk.Entry(ventana, width=40)
+tipos_archivo_entry.pack(pady=5)
+tipos_archivo_entry.insert(0, ".xlsx, .xls, .csv")  # valor por defecto
 
-tk.Label(ventana, text="Sufijo:").grid(row=3, column=0)
-tk.Entry(ventana, textvariable=sufijo_var, width=40).grid(row=3, column=1)
+# Botón para iniciar el proceso de renombrado
+renombrar_button = tk.Button(ventana, text="Renombrar Archivos", command=renombrar_archivos)
+renombrar_button.pack(pady=20)
 
-tk.Button(ventana, text="Renombrar Archivos", command=renombrar_archivos).grid(row=4, column=0, columnspan=3)
-
-status_label = tk.Label(ventana, text="", fg="green")
-status_label.grid(row=5, column=0, columnspan=3)
-
-# Ejecutar la ventana
+# Iniciar la ventana
 ventana.mainloop()
+2
