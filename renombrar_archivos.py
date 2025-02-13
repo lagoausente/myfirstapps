@@ -116,3 +116,4 @@ renombrar_button.pack(pady=20)
 
 # Iniciar la ventana
 ventana.mainloop()
+2
