@@ -1,3 +1,4 @@
+#root.geometry("600x400")  # Ajusta estos valores según lo que necesites
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -6,7 +7,8 @@ class FileRenamerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Renombrar Archivos")
-        
+        self.root.geometry("600x400")  # Ajustar tamaño
+        self.root.resizable(False, False)  # Evitar cambios de tamaño        
         self.origin_dir = tk.StringVar()
         self.dest_dir = tk.StringVar()
         self.prefix = tk.StringVar()
