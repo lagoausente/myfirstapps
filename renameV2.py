@@ -14,6 +14,7 @@ class FileRenamerApp:
         self.prefix = tk.StringVar()
         self.suffix = tk.StringVar()
         self.new_extension = tk.StringVar()
+        self.root.update_idletasks()
         
         tk.Label(root, text="Directorio de Origen:").grid(row=0, column=0)
         tk.Entry(root, textvariable=self.origin_dir, width=40).grid(row=0, column=1)
