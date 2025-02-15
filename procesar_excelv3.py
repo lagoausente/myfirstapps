@@ -4,37 +4,82 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 
 def obtener_columnas_comunes(carpeta):
-    archivos = [f for f in os.listdir(carpeta) if f.endswith('.xlsx') or f.endswith('.xls')]
-    columnas_comunes = None
-    
-    for archivo in archivos:
-        ruta = os.path.join(carpeta, archivo)
-        df = pd.read_excel(ruta, nrows=1)  # Leer solo la primera fila para extraer las columnas
+    try:
+        archivos = [f for f in os.listdir(carpeta) if f.endswith('.xlsx') or f.endswith('.xls')]
+        print(f"Archivos encontrados en la carpeta: {archivos}")  # Depuración
+
+        if not archivos:
+            print("⚠️ No se encontraron archivos Excel en la carpeta seleccionada.")
+            return []
+
+        columnas_comunes = None
         
-        if columnas_comunes is None:
-            columnas_comunes = set(df.columns)
-        else:
-            columnas_comunes &= set(df.columns)  # Intersección de columnas
-    
-    print(f"Columnas comunes detectadas: {columnas_comunes}")  # Depuración
-    return list(columnas_comunes) if columnas_comunes else []
+        for archivo in archivos:
+            ruta = os.path.join(carpeta, archivo)
+            print(f"Intentando leer: {ruta}")  # Ver qué archivos se están leyendo
+
+            try:
+                df = pd.read_excel(ruta, header=None)  # No asume nombres de columna
+
+                if df.empty:
+                    print(f"⚠️ El archivo {archivo} está vacío o no tiene contenido útil.")
+                    continue
+
+                # Buscar la primera fila con contenido
+                for i, row in df.iterrows():
+                    if not row.isnull().all():  # Si la fila no está completamente vacía
+                        df.columns = row  # Usar esta fila como nombres de columna
+                        df = df.iloc[i+1:]  # Eliminar las filas superiores
+                        break
+
+                # Si todas las filas estaban vacías o los nombres de columna son NaN, asignar nombres automáticos
+                if df.columns.isnull().all():
+                    df.columns = [f"Columna_{i+1}" for i in range(len(df.columns))]
+
+                print(f"Columnas en {archivo}: {df.columns.tolist()}")  # Ver columnas detectadas
+
+                if columnas_comunes is None:
+                    columnas_comunes = set(df.columns)
+                else:
+                    columnas_comunes &= set(df.columns)  # Intersección de columnas
+
+            except Exception as e:
+                print(f"❌ Error al leer {archivo}: {e}")  # Mostrar error si falla la lectura
+                continue  # Saltar este archivo y seguir con el siguiente
+
+        print(f"✅ Columnas comunes detectadas: {columnas_comunes}")  # Última verificación
+        return list(columnas_comunes) if columnas_comunes else []
+
+    except Exception as e:
+        print(f"❌ Error en obtener_columnas_comunes(): {e}")
+        return []
+
+
 
 def seleccionar_carpeta():
     global carpeta_seleccionada
     carpeta_seleccionada = filedialog.askdirectory()
     
     if carpeta_seleccionada:
+        print(f"📂 Carpeta seleccionada: {carpeta_seleccionada}")
+
+        # Verificar que hay archivos en la carpeta
+        archivos = os.listdir(carpeta_seleccionada)
+        print(f"Archivos detectados en la carpeta: {archivos}")
+
         carpeta_label.config(text=f"📂 Carpeta seleccionada:\n{carpeta_seleccionada}")
-        carpeta_label.config(text=f"📂 Carpeta seleccionada:\n{carpeta_seleccionada}")
-        carpeta_label.config(text=f"\ \ Carpeta seleccionada:\n{carpeta_seleccionada}")
+
         columnas = obtener_columnas_comunes(carpeta_seleccionada)
-        print(f"Columnas que se añadirán a la lista: {columnas}")  # Depuración
-        
+        print(f"Columnas a mostrar en Listbox: {columnas}")
+
         lista_columnas.delete(0, tk.END)  # Borrar opciones previas
         
-        lista_columnas.insert(tk.END, "Columna de prueba")  # Prueba visual
+        if not columnas:
+            lista_columnas.insert(tk.END, "⚠️ No se encontraron columnas")
+
         for col in columnas:
             lista_columnas.insert(tk.END, col)  # Añadir columnas comunes
+
 
 def seleccionar_destino():
     global ruta_destino
