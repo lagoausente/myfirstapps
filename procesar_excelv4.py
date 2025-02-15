@@ -17,7 +17,7 @@ def obtener_columnas_comunes(carpeta):
                     continue
                 for i, row in df.iterrows():
                     if not row.isnull().all():
-                        df.columns = row
+                        df.columns = [str(col).strip().lower() for col in row]  # Convertir a minúsculas y eliminar espacios extra
                         df = df.iloc[i+1:]
                         break
                 if df.columns.isnull().all():
@@ -86,7 +86,7 @@ style.configure("TButton", padding=5, relief="flat", background="#0078D7", foreg
 frame = ttk.Frame(root, padding=10)
 frame.pack(fill=tk.BOTH, expand=True)
 
-carpeta_label = ttk.Label(frame, text="📂 Ninguna carpeta seleccionada", foreground="gray")
+carpeta_label = ttk.Label(frame, text="📂 Ninguna carpeta seleccionada", foreground="black")
 carpeta_label.pack()
 btn_carpeta = ttk.Button(frame, text="📁 Seleccionar Carpeta", command=seleccionar_carpeta)
 btn_carpeta.pack()
@@ -99,7 +99,7 @@ tk.Label(frame, text="Selecciona columnas:").pack()
 lista_columnas = tk.Listbox(frame, selectmode=tk.MULTIPLE, height=6)
 lista_columnas.pack()
 
-destino_label = ttk.Label(frame, text="📁 Ningún destino seleccionado", foreground="gray")
+destino_label = ttk.Label(frame, text="📁 Ningún destino seleccionado", foreground="black")
 destino_label.pack()
 btn_destino = ttk.Button(frame, text="📁 Seleccionar Destino", command=seleccionar_destino)
 btn_destino.pack()
