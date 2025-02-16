@@ -81,8 +81,9 @@ root = tk.Tk()
 root.title("Procesador de Excel")
 root.geometry("500x400")
 style = ttk.Style()
-style.configure("TButton", padding=5, relief="flat", background="#0078D7", foreground="white")
-
+style.theme_use("clam")  # Fuerza un tema compatible que respeta los colores
+style.configure("TButton", padding=5, relief="flat", font=("Arial", 10))
+style.map("TButton", background=[("active", "#005bb5"), ("!active", "#0078D7")], foreground=[("active", "white"), ("!active", "white")])
 frame = ttk.Frame(root, padding=10)
 frame.pack(fill=tk.BOTH, expand=True)
 
