@@ -19,9 +19,11 @@ def obtener_columnas_comunes(carpeta):
                     if not row.isnull().all():
                         df.columns = [str(col).strip().lower() for col in row]  # Convierte nombres a minúsculas
                         df = df.iloc[i+1:]  # Elimina filas superiores
-                        # 🔹 Ahora eliminamos columnas vacías si quedaron
-                        df = df.dropna(axis=1, how="all")
+                        df.columns = [str(col).strip().lower() for col in df.columns]  # ✅ **Transformar nombres de columna a minúsculas**
+                        df = df.dropna(axis=1, how="all")   # 🔹 Ahora eliminamos columnas vacías si quedaron
                         df = df.loc[:, (df.columns != "")]  # También elimina columnas con nombre vacío
+                        print(f"📂 Archivo: {archivo} ➝ Columnas detectadas: {df.columns.tolist()}")  
+                        print(f"Columnas en {archivo}: {df.columns.tolist()}")  # Depuración
                         break
                 if df.columns.isnull().all():
                     df.columns = [f"Columna_{i+1}" for i in range(len(df.columns))]
