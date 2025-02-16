@@ -64,6 +64,7 @@ def procesar_archivos():
         return
     filtro_texto = entrada_filtro.get()
     seleccionadas = [lista_columnas.get(i) for i in lista_columnas.curselection()]
+    print(f"📌 Columnas seleccionadas por el usuario: {seleccionadas}")
     if not seleccionadas:
         messagebox.showerror("Error", "Selecciona al menos una columna")
         return
@@ -72,10 +73,16 @@ def procesar_archivos():
     progress_bar.start()
     for archivo in archivos:
         ruta = os.path.join(carpeta_seleccionada, archivo)
-        # Leer el archivo sin filtrar columnas primero
-        df = pd.read_excel(ruta)
-        columnas_validas = [col for col in seleccionadas if col in df.columns]
-        df = df[columnas_validas]  # Aplicar la selección de columnas
+        df = pd.read_excel(ruta)  
+        df.columns = [str(col).strip().lower() for col in df.columns] 
+        df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False)]
+        seleccionadas_lower = [col.lower() for col in seleccionadas]
+        columnas_validas = [col for col in seleccionadas_lower if col in df.columns]
+        print(f"📌 Archivo procesado: {archivo} ➝ Columnas después de limpieza: {df.columns.tolist()}")
+        print(f"📌 Columnas seleccionadas por el usuario después de conversión: {seleccionadas_lower}")
+        print(f"📌 Columnas válidas que serán usadas: {columnas_validas}")
+        seleccionadas_lower = [col.lower() for col in seleccionadas]
+        columnas_validas = [col for col in seleccionadas_lower if col in df.columns]
         if filtro_texto:
             df = df[df.apply(lambda row: row.astype(str).str.contains(filtro_texto, case=False).any(), axis=1)]
         data_frames.append(df)
