@@ -98,7 +98,7 @@ carpeta_label.pack()
 btn_carpeta = ttk.Button(frame, text="📁 Seleccionar Carpeta", command=seleccionar_carpeta)
 btn_carpeta.pack()
 
-tk.Label(frame, text="Filtrar por texto:").pack()
+tk.Label(frame, text="Filtrar filas que contengan:").pack()
 entrada_filtro = ttk.Entry(frame)
 entrada_filtro.pack()
 
