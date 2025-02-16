@@ -17,8 +17,11 @@ def obtener_columnas_comunes(carpeta):
                     continue
                 for i, row in df.iterrows():
                     if not row.isnull().all():
-                        df.columns = [str(col).strip().lower() if pd.notna(col) else "" for col in row]
-                        df = df.iloc[i+1:]
+                        df.columns = [str(col).strip().lower() for col in row]  # Convierte nombres a minúsculas
+                        df = df.iloc[i+1:]  # Elimina filas superiores
+                        # 🔹 Ahora eliminamos columnas vacías si quedaron
+                        df = df.dropna(axis=1, how="all")
+                        df = df.loc[:, (df.columns != "")]  # También elimina columnas con nombre vacío
                         break
                 if df.columns.isnull().all():
                     df.columns = [f"Columna_{i+1}" for i in range(len(df.columns))]
