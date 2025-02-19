@@ -1,0 +1,84 @@
+import os
+import pandas as pd
+import customtkinter as ctk
+from tkinter import filedialog, messagebox
+
+ctk.set_appearance_mode("System")  # Soporta modo oscuro y claro
+ctk.set_default_color_theme("blue")
+
+class ExcelProcessorApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("Procesador de Excel Batch")
+        self.geometry("850x600")
+
+        self.files = []
+        self.dataframes = []
+        
+        # Frame principal
+        self.frame = ctk.CTkFrame(self)
+        self.frame.pack(pady=20, padx=20, fill="both", expand=True)
+        
+        # Botones
+        self.btn_select = ctk.CTkButton(self.frame, text="Seleccionar archivos", command=self.load_files)
+        self.btn_select.pack(pady=10)
+        
+        self.btn_process = ctk.CTkButton(self.frame, text="Procesar archivos", command=self.process_files)
+        self.btn_process.pack(pady=10)
+        
+        self.btn_export = ctk.CTkButton(self.frame, text="Exportar", command=self.export_files)
+        self.btn_export.pack(pady=10)
+        
+        # Vista previa con Treeview
+        self.tree_frame = ctk.CTkFrame(self.frame)
+        self.tree_frame.pack(pady=10, fill="both", expand=True)
+        
+        self.tree = ctk.CTkTextbox(self.tree_frame, width=800, height=300, wrap="none")
+        self.tree.pack(pady=5, padx=5, fill="both", expand=True)
+    
+    def load_files(self):
+        file_paths = filedialog.askopenfilenames(filetypes=[("Excel Files", "*.xlsx;*.xls")])
+        if file_paths:
+            self.files = file_paths
+            messagebox.showinfo("Archivos cargados", f"Se han seleccionado {len(self.files)} archivos")
+    
+    def process_files(self):
+        if not self.files:
+            messagebox.showwarning("Sin archivos", "Seleccione archivos antes de procesar.")
+            return
+        
+        self.dataframes = []
+        for file in self.files:
+            df = pd.read_excel(file)
+            df = self.clean_dataframe(df)
+            self.dataframes.append(df)
+        
+        self.display_preview(self.dataframes[0])
+        messagebox.showinfo("Proceso completado", "Archivos procesados correctamente.")
+    
+    def clean_dataframe(self, df):
+        df = df.dropna(how='all')  # Eliminar filas vacías
+        df = df.loc[:, ~df.columns.duplicated()]  # Eliminar columnas duplicadas
+        df.columns = df.columns.str.strip().str.replace(" ", "_")  # Limpiar nombres de columnas
+        return df
+    
+    def display_preview(self, df):
+        preview_text = df.head(10).to_string(index=False)
+        self.tree.delete("1.0", "end")
+        self.tree.insert("1.0", preview_text)
+    
+    def export_files(self):
+        if not self.dataframes:
+            messagebox.showwarning("Sin datos", "No hay datos para exportar.")
+            return
+        
+        save_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")])
+        if save_path:
+            with pd.ExcelWriter(save_path) as writer:
+                for i, df in enumerate(self.dataframes):
+                    df.to_excel(writer, sheet_name=f"Archivo_{i+1}", index=False)
+            messagebox.showinfo("Exportación exitosa", "Datos exportados correctamente.")
+
+if __name__ == "__main__":
+    app = ExcelProcessorApp()
+    app.mainloop()
