@@ -2,164 +2,189 @@ import os
 import pandas as pd
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, Listbox, MULTIPLE
-
-ctk.set_appearance_mode("System")  
-ctk.set_default_color_theme("blue")
+import tkinter.font as tkFont
 
 class ExcelProcessorApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("Procesador de Excel Batch")
         self.geometry("900x700")
+        self.font_style = tkFont.Font(family="Arial", size=10)
 
         self.folder_path = ""
         self.output_path = ""
-        self.dataframes = {}  # Almacenar archivos y sus hojas
-        self.selected_files = set()  # Archivos confirmados
-        self.selected_sheets = {}  # Hojas confirmadas de cada archivo
+        self.dataframes = []
+        self.columns = []
+        self.history = []
 
         # Frame principal
         self.frame = ctk.CTkFrame(self)
-        self.frame.pack(pady=10, padx=10, fill="both", expand=True)
+        self.frame.pack(pady=10, padx=10, fill="x")
 
-        # Sección de archivos y pestañas
-        self.files_frame = ctk.CTkFrame(self.frame)
-        self.files_frame.pack(pady=5, padx=5, fill="x")
-
-        # Lista de archivos Excel
-        self.label_files = ctk.CTkLabel(self.files_frame, text="Archivos Excel:")
-        self.label_files.grid(row=0, column=0, padx=5, pady=5)
-
-        self.files_listbox = Listbox(self.files_frame, selectmode=MULTIPLE, height=5, width=40)
-        self.files_listbox.grid(row=1, column=0, padx=5, pady=5)
-
-        # Botón para confirmar archivos
-        self.btn_confirm_files = ctk.CTkButton(self.files_frame, text="Confirmar Archivos", command=self.confirm_files)
-        self.btn_confirm_files.grid(row=2, column=0, padx=5, pady=5)
-
-        # Lista de pestañas (hojas de Excel)
-        self.label_sheets = ctk.CTkLabel(self.files_frame, text="Hojas Disponibles:")
-        self.label_sheets.grid(row=0, column=1, padx=5, pady=5)
-
-        self.sheets_listbox = Listbox(self.files_frame, selectmode=MULTIPLE, height=5, width=40)
-        self.sheets_listbox.grid(row=1, column=1, padx=5, pady=5)
-
-        # Botón para confirmar hojas
-        self.btn_confirm_sheets = ctk.CTkButton(self.files_frame, text="Confirmar Hojas", command=self.confirm_sheets)
-        self.btn_confirm_sheets.grid(row=2, column=1, padx=5, pady=5)
 
         # Botón para seleccionar carpeta
         self.btn_select = ctk.CTkButton(self.frame, text="Seleccionar carpeta", command=self.load_folder)
         self.btn_select.pack(pady=10)
 
-        # Botón de exportación
+        # Lista de selección múltiple de columnas
+ 
+        self.listbox_frame = ctk.CTkFrame(self.frame)
+        self.listbox_frame.pack(pady=10, padx=10, fill="x")
+
+         # Listbox 1 (izquierda)
+        self.left_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=10,font=self.font_style)
+        self.left_listbox.pack(side="left", padx=10, pady=10)
+        self.left_listbox.config(width=30)  # Ajustar tamaño manualmente
+
+        # Listbox 2 (centro)
+        self.center_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=25,font=self.font_style)
+        self.center_listbox.pack(side="left", padx=10, pady=10)
+        self.center_listbox.config(width=30)  # Ajustar tamaño manualmente
+
+        # Listbox 3 (derecha)
+        self.right_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=20,font=self.font_style)
+        self.right_listbox.pack(side="left", padx=10, pady=10)
+        self.right_listbox.config(width=30)  # Ajustar tamaño manualmente
+
+
+        # Opciones de transformación (sin "Eliminar espacios")
+        self.transform_var = ctk.StringVar(value="Ninguna")
+        self.transform_dropdown = ctk.CTkComboBox(self.frame, values=["Ninguna", "Mayúsculas", "Minúsculas"], variable=self.transform_var)
+        self.transform_dropdown.pack(pady=10)
+
+        # Entrada para filtro de datos
+        self.filter_entry = ctk.CTkEntry(self.frame, placeholder_text="Filtrar filas que contengan...")
+        self.filter_entry.pack(pady=10)
+
+        # Selección de formato de exportación
+        self.export_var = ctk.StringVar(value="Excel")
+        self.export_dropdown = ctk.CTkComboBox(self.frame, values=["Excel", "CSV", "TSV"], variable=self.export_var)
+        self.export_dropdown.pack(pady=10)
+
+        # Selección de ruta de salida
+        self.btn_output = ctk.CTkButton(self.frame, text="Seleccionar ruta de salida", command=self.select_output)
+        self.btn_output.pack(pady=10)
+
+        # Botón para exportar
         self.btn_export = ctk.CTkButton(self.frame, text="Exportar archivo", command=self.export_file)
         self.btn_export.pack(pady=10)
 
-        # Vista previa
-        self.tree = ctk.CTkTextbox(self.frame, height=200, width=800)
+        # Barra de progreso
+        self.progress = ctk.CTkProgressBar(self.frame)
+        self.progress.pack(pady=10, fill="x")
+        self.progress.set(0)
+
+        # Historial de acciones
+        self.history_textbox = ctk.CTkTextbox(self.frame, height=100, width=600)
+        self.history_textbox.pack(pady=10)
+
+        # Vista previa extendida
+        self.tree = ctk.CTkTextbox(self.frame, height=300, width=800)
         self.tree.pack(pady=5, padx=5, fill="both", expand=True)
 
     def load_folder(self):
-        """Carga los archivos Excel y permite seleccionarlos sin perder selecciones previas."""
         folder_selected = filedialog.askdirectory()
         if folder_selected:
             self.folder_path = folder_selected
             files = [f for f in os.listdir(folder_selected) if f.endswith(('.xlsx', '.xls'))]
             if files:
-                self.files_listbox.delete(0, "end")
-                for file in files:
-                    file_path = os.path.join(self.folder_path, file)
-                    try:
-                        xls = pd.ExcelFile(file_path)
-                        self.files_listbox.insert("end", file)
-                        self.dataframes[file] = xls
-                        if file not in self.selected_sheets:
-                            self.selected_sheets[file] = set()  # Inicializa selección vacía
-                    except Exception as e:
-                        messagebox.showwarning("Error al cargar", f"No se pudo leer {file}: {e}")
+                self.load_files(files)
             else:
                 messagebox.showwarning("Sin archivos", "No se encontraron archivos Excel en la carpeta seleccionada.")
 
-    def confirm_files(self):
-        """Confirma la selección de archivos antes de seleccionar hojas."""
-        selected_indices = self.files_listbox.curselection()
-        selected_files = {self.files_listbox.get(i) for i in selected_indices}
-        
-        if not selected_files:
-            messagebox.showwarning("Selección inválida", "Seleccione al menos un archivo antes de confirmar.")
-            return
+    def load_files(self, files):
+        self.dataframes = []
+        for file in files:
+            file_path = os.path.join(self.folder_path, file)
+            df = pd.read_excel(file_path)
+            df = self.clean_dataframe(df)
+            self.dataframes.append(df)
 
-        self.selected_files = selected_files  # Fijar archivos seleccionados
-        self.sheets_listbox.delete(0, "end")  # Limpiar la lista de hojas
+        if self.dataframes:
+            self.columns = list(self.dataframes[0].columns)
+            self.left_listbox.delete(0, "end")
+            for col in self.columns:
+                self.left_listbox.insert("end", col)
+            messagebox.showinfo("Archivos cargados", f"Se han cargado {len(self.dataframes)} archivos correctamente.")
 
-        # Agregar hojas de los archivos seleccionados
-        for file in self.selected_files:
-            if file in self.dataframes:
-                sheets = self.dataframes[file].sheet_names
-                for sheet in sheets:
-                    self.sheets_listbox.insert("end", f"{file} -> {sheet}")
-
-        messagebox.showinfo("Confirmación", f"Archivos seleccionados: {', '.join(self.selected_files)}")
-
-    def confirm_sheets(self):
-        """Confirma la selección de hojas antes de la exportación."""
-        selected_indices = self.sheets_listbox.curselection()
-        selected_sheets = [self.sheets_listbox.get(i) for i in selected_indices]
-
-        if not selected_sheets:
-            messagebox.showwarning("Selección inválida", "Seleccione al menos una hoja antes de confirmar.")
-            return
-
-        for sheet_entry in selected_sheets:
-            file, sheet = sheet_entry.split(" -> ")
-            if file in self.selected_sheets:
-                self.selected_sheets[file].add(sheet)
-
-        messagebox.showinfo("Confirmación", f"Hojas seleccionadas:\n" + "\n".join(selected_sheets))
+    def select_output(self):
+        self.output_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx"), ("CSV", "*.csv"), ("TSV", "*.tsv")])
+        if self.output_path:
+            messagebox.showinfo("Ruta seleccionada", f"El archivo se guardará en: {self.output_path}")
 
     def export_file(self):
-        """Exporta las hojas confirmadas de los archivos seleccionados."""
-        if not self.selected_files:
-            messagebox.showwarning("Selección inválida", "Seleccione y confirme al menos un archivo.")
+        if not self.dataframes:
+            messagebox.showwarning("Sin archivos", "Seleccione una carpeta antes de exportar.")
             return
 
-        selected_data = []
-        for file in self.selected_files:
-            if file in self.selected_sheets:
-                for sheet in self.selected_sheets[file]:
-                    try:
-                        df = self.dataframes[file].parse(sheet)
-                        selected_data.append(df)
-                    except Exception as e:
-                        messagebox.showwarning("Error", f"No se pudo leer {file} -> {sheet}: {e}")
+        selected_indices = self.left_listbox.curselection()
+        selected_columns = [self.left_listbox.get(i) for i in selected_indices]
 
-        if not selected_data:
-            messagebox.showwarning("Error", "No se seleccionó ninguna hoja válida para exportar.")
+        if not selected_columns:
+            messagebox.showwarning("Selección inválida", "Seleccione al menos una columna para exportar.")
             return
 
-        final_df = pd.concat(selected_data, ignore_index=True)
-        self.display_preview(final_df)
+        filter_text = self.filter_entry.get()
+        transform_option = self.transform_var.get()
 
-        self.output_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx"), ("CSV", "*.csv"), ("TSV", "*.tsv")])
-        if not self.output_path:
-            return
+        self.progress.set(0.2)
 
-        export_format = "Excel"
-        if export_format == "Excel":
-            final_df.to_excel(self.output_path, index=False)
-        elif export_format == "CSV":
-            final_df.to_csv(self.output_path, index=False, sep=",")
-        elif export_format == "TSV":
-            final_df.to_csv(self.output_path, index=False, sep="\t")
+        processed_data = []
+        for df in self.dataframes:
+            df = df[selected_columns]
 
-        messagebox.showinfo("Exportación completada", "El archivo se ha guardado correctamente.")
+            # Siempre eliminar espacios extra
+            df = df.applymap(lambda x: self.remove_extra_spaces(x) if isinstance(x, str) else x)
+
+            # Aplicar transformación según la opción elegida
+            if transform_option == "Mayúsculas":
+                df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
+            elif transform_option == "Minúsculas":
+                df = df.applymap(lambda x: x.lower() if isinstance(x, str) else x)
+
+            if filter_text:
+                df = df[df.astype(str).apply(lambda row: row.str.contains(filter_text, case=False).any(), axis=1)]
+
+            processed_data.append(df)
+
+        if processed_data:
+            final_df = pd.concat(processed_data, ignore_index=True)
+            self.display_preview(final_df)
+            self.history.append(f"Exportado: {len(processed_data)} archivos con {len(final_df)} filas.")
+
+            if not self.output_path:
+                self.select_output()
+                if not self.output_path:
+                    return
+
+            export_format = self.export_var.get()
+            if export_format == "Excel":
+                final_df.to_excel(self.output_path, index=False)
+            elif export_format == "CSV":
+                final_df.to_csv(self.output_path, index=False, sep=",")
+            elif export_format == "TSV":
+                final_df.to_csv(self.output_path, index=False, sep="\t")
+
+            self.progress.set(1.0)
+            messagebox.showinfo("Exportación completada", "El archivo se ha guardado correctamente.")
+
+    def remove_extra_spaces(self, text):
+        """Elimina espacios extra dentro del texto (manteniendo separación entre palabras)"""
+        while "  " in text:  # Reemplaza espacios dobles hasta que solo quede uno
+            text = text.replace("  ", " ")
+        return text.strip()  # También elimina espacios al inicio y final
 
     def display_preview(self, df):
-        """Muestra una vista previa de los primeros 10 registros."""
         preview_text = df.head(10).to_string(index=False)
         self.tree.delete("1.0", "end")
         self.tree.insert("1.0", preview_text)
+
+    def clean_dataframe(self, df):
+        df = df.dropna(how='all')  
+        df = df.loc[:, ~df.columns.duplicated()]  
+        df.columns = df.columns.str.strip().str.lower()  
+        df = df.loc[:, ~df.columns.str.startswith("unnamed")]  
+        return df
 
 if __name__ == "__main__":
     app = ExcelProcessorApp()
