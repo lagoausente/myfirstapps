@@ -9,7 +9,7 @@ class ExcelProcessorApp(ctk.CTk):
         super().__init__()
         self.title("Procesador de Excel Batch")
         self.geometry("900x700")
-        self.font_style = tkFont.Font(family="Arial", size=10)
+        self.font_style = tkFont.Font(family="Arial", size=12)
 
         self.folder_path = ""
         self.output_path = ""
@@ -26,25 +26,26 @@ class ExcelProcessorApp(ctk.CTk):
         self.btn_select = ctk.CTkButton(self.frame, text="Seleccionar carpeta", command=self.load_folder)
         self.btn_select.pack(pady=10)
 
-        # Lista de selección múltiple de columnas
- 
+        # Frame que contiene los Listbox
         self.listbox_frame = ctk.CTkFrame(self.frame)
         self.listbox_frame.pack(pady=10, padx=10, fill="x")
 
-         # Listbox 1 (izquierda)
-        self.left_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=10,font=self.font_style)
-        self.left_listbox.pack(side="left", padx=10, pady=10)
-        self.left_listbox.config(width=30)  # Ajustar tamaño manualmente
+        # Usar grid() en lugar de pack() para alinear bien los listbox
+        self.listbox_frame.columnconfigure(0, weight=1)  # Columna 1
+        self.listbox_frame.columnconfigure(1, weight=1)  # Columna 2
+        self.listbox_frame.columnconfigure(2, weight=1)  # Columna 3
 
-        # Listbox 2 (centro)
-        self.center_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=25,font=self.font_style)
-        self.center_listbox.pack(side="left", padx=10, pady=10)
-        self.center_listbox.config(width=30)  # Ajustar tamaño manualmente
+        # Listbox 1: Selección de columnas
+        self.column_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=15, font=self.font_style)
+        self.column_listbox.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Listbox 3 (derecha)
-        self.right_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=20,font=self.font_style)
-        self.right_listbox.pack(side="left", padx=10, pady=10)
-        self.right_listbox.config(width=30)  # Ajustar tamaño manualmente
+         # Listbox 2: Selección de archivos
+        self.center_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=25, font=self.font_style)
+        self.center_listbox.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+         # Listbox 3: Selección de hojas
+        self.right_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=20, font=self.font_style)
+        self.right_listbox.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
 
 
         # Opciones de transformación (sin "Eliminar espacios")
@@ -102,9 +103,9 @@ class ExcelProcessorApp(ctk.CTk):
 
         if self.dataframes:
             self.columns = list(self.dataframes[0].columns)
-            self.left_listbox.delete(0, "end")
+            self.column_listbox.delete(0, "end")
             for col in self.columns:
-                self.left_listbox.insert("end", col)
+                self.column_listbox.insert("end", col)
             messagebox.showinfo("Archivos cargados", f"Se han cargado {len(self.dataframes)} archivos correctamente.")
 
     def select_output(self):
@@ -117,8 +118,8 @@ class ExcelProcessorApp(ctk.CTk):
             messagebox.showwarning("Sin archivos", "Seleccione una carpeta antes de exportar.")
             return
 
-        selected_indices = self.left_listbox.curselection()
-        selected_columns = [self.left_listbox.get(i) for i in selected_indices]
+        selected_indices = self.column_listbox.curselection()
+        selected_columns = [self.column_listbox.get(i) for i in selected_indices]
 
         if not selected_columns:
             messagebox.showwarning("Selección inválida", "Seleccione al menos una columna para exportar.")
