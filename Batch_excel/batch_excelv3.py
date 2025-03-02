@@ -16,6 +16,9 @@ class ExcelProcessorApp(ctk.CTk):
         self.dataframes = []
         self.columns = []
         self.history = []
+        self.files = []  # Lista para almacenar los nombres de los archivos Excel
+        self.sheets = {}  # Diccionario para almacenar las hojas de cada archivo
+
 
         # Frame principal
         self.frame = ctk.CTkFrame(self)
@@ -36,16 +39,19 @@ class ExcelProcessorApp(ctk.CTk):
         self.listbox_frame.columnconfigure(2, weight=1)  # Columna 3
 
         # Listbox 1: Selección de columnas
-        self.column_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=15, font=self.font_style)
+        self.column_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=15, font=self.font_style, exportselection=False)
         self.column_listbox.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-         # Listbox 2: Selección de archivos
-        self.center_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=25, font=self.font_style)
+        # Listbox 2: Selección de archivos
+        self.center_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=25, font=self.font_style, exportselection=False)
         self.center_listbox.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        self.center_listbox.bind("<<ListboxSelect>>", self.load_sheets)
 
-         # Listbox 3: Selección de hojas
-        self.right_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=20, font=self.font_style)
+        # Listbox 3: Selección de hojas
+        self.right_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=20, font=self.font_style, exportselection=False)
         self.right_listbox.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+        self.right_listbox.bind("<<ListboxSelect>>", self.load_columns)
+
 
 
         # Opciones de transformación (sin "Eliminar espacios")
@@ -87,12 +93,63 @@ class ExcelProcessorApp(ctk.CTk):
         folder_selected = filedialog.askdirectory()
         if folder_selected:
             self.folder_path = folder_selected
-            files = [f for f in os.listdir(folder_selected) if f.endswith(('.xlsx', '.xls'))]
-            if files:
-                self.load_files(files)
-            else:
-                messagebox.showwarning("Sin archivos", "No se encontraron archivos Excel en la carpeta seleccionada.")
+            self.files = [f for f in os.listdir(folder_selected) if f.endswith(('.xlsx', '.xls'))]
+            self.center_listbox.delete(0, "end")
+            self.sheets.clear()
 
+            if self.files:
+                for file in self.files:
+                    self.center_listbox.insert("end", file)
+                    file_path = os.path.join(self.folder_path, file)
+                    xls = pd.ExcelFile(file_path)
+                    self.sheets[file] = xls.sheet_names  # Almacena las hojas del archivo
+                messagebox.showinfo("Archivos cargados", f"Se han cargado {len(self.files)} archivos.")
+        else:
+                messagebox.showwarning("Sin archivos", "No se encontraron archivos Excel en la carpeta seleccionada.")
+    def load_columns(self, event):
+        selected_file_indices = self.center_listbox.curselection()
+        selected_sheet_indices = self.right_listbox.curselection()
+
+        if not selected_file_indices or not selected_sheet_indices:
+            return
+
+        # Limpiar la lista de dataframes antes de cargar nuevos
+        self.dataframes = []
+
+        for file_index in selected_file_indices:
+            file_name = self.center_listbox.get(file_index)
+            file_path = os.path.join(self.folder_path, file_name)
+
+            for sheet_index in selected_sheet_indices:
+                sheet_name = self.right_listbox.get(sheet_index)
+
+                # Leer el archivo y la hoja seleccionada
+                df = pd.read_excel(file_path, sheet_name=sheet_name)
+                df = self.clean_dataframe(df)
+
+                # Añadir el DataFrame a la lista
+                self.dataframes.append(df)
+
+        # Actualizar la lista de columnas basándose en el primer DataFrame cargado
+        if self.dataframes:
+            self.columns = list(self.dataframes[0].columns)
+            self.column_listbox.delete(0, "end")
+            for col in self.columns:
+                self.column_listbox.insert("end", col)
+            messagebox.showinfo("Hojas cargadas", f"Se han cargado {len(self.dataframes)} hojas correctamente.")
+        else:
+            messagebox.showwarning("Sin datos", "No se pudieron cargar datos de las hojas seleccionadas.")
+
+
+
+    def load_sheets(self, event):
+        selected_indices = self.center_listbox.curselection()
+        self.right_listbox.delete(0, "end")
+        for i in selected_indices:
+            file_name = self.center_listbox.get(i)
+            if file_name in self.sheets:
+                for sheet in self.sheets[file_name]:
+                    self.right_listbox.insert("end", sheet)
     def load_files(self, files):
         self.dataframes = []
         for file in files:
@@ -100,6 +157,7 @@ class ExcelProcessorApp(ctk.CTk):
             df = pd.read_excel(file_path)
             df = self.clean_dataframe(df)
             self.dataframes.append(df)
+            print(f"Archivo {file} cargado con {len(df)} filas y {len(df.columns)} columnas.")  # Línea de depuración
 
         if self.dataframes:
             self.columns = list(self.dataframes[0].columns)
@@ -110,6 +168,7 @@ class ExcelProcessorApp(ctk.CTk):
 
     def select_output(self):
         self.output_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx"), ("CSV", "*.csv"), ("TSV", "*.tsv")])
+        print(f"Ruta de salida seleccionada: {self.output_path}")  # Línea de depuración
         if self.output_path:
             messagebox.showinfo("Ruta seleccionada", f"El archivo se guardará en: {self.output_path}")
 
@@ -155,6 +214,7 @@ class ExcelProcessorApp(ctk.CTk):
 
             if not self.output_path:
                 self.select_output()
+                print(f"Ruta de salida seleccionada: {self.output_path}")
                 if not self.output_path:
                     return
 
