@@ -116,7 +116,13 @@ class ExcelProcessorApp(ctk.CTk):
 
         print("Ejecutando load_columns...")  # 🛠 Línea de depuración
 
-        for file_name, selected_sheets in self.selected_files_sheets.items():
+        for file_name_clean, selected_sheets in self.selected_files_sheets.items():
+            # Recuperar el nombre de archivo original con su extensión
+            file_name = next((f for f in self.files if f.startswith(file_name_clean)), None)
+            if not file_name:
+                print(f"⚠ No se encontró el archivo real para {file_name_clean}")
+                continue
+
             file_path = os.path.join(self.folder_path, file_name)
 
             for sheet_name in selected_sheets:
@@ -144,22 +150,35 @@ class ExcelProcessorApp(ctk.CTk):
 
 
 
+
     def load_sheets(self, event):
         selected_indices = self.center_listbox.curselection()
-        self.right_listbox.delete(0, 'end')  # ✅ Limpiar la lista de hojas
+        self.right_listbox.delete(0, 'end')  # ✅ Limpiar lista de hojas
 
         self.selected_files_sheets.clear()
 
         for i in selected_indices:
             file_name = self.center_listbox.get(i)
+            file_name_clean = file_name.replace(".xlsx", "").replace(".xls", "")  # ✅ Quitar extensión
+
             if file_name in self.sheets:
                 for sheet in self.sheets[file_name]:
-                    sheet_label = f"{file_name} - {sheet}"  # Agregar el nombre del archivo
-                    self.right_listbox.insert('end', sheet_label)
+                    file_path = os.path.join(self.folder_path, file_name)
+                    
+                    try:
+                        df = pd.read_excel(file_path, sheet_name=sheet)
+                        if df.dropna(how="all").empty:  # ❌ Si la hoja está vacía, la ignoramos
+                            continue
+                        
+                        sheet_label = f"{file_name_clean} - {sheet}"  # ✅ Usar nombre sin extensión
+                        self.right_listbox.insert('end', sheet_label)
+                    except Exception as e:
+                        print(f"Error al leer {sheet} de {file_name}: {e}")
 
                 self.selected_files_sheets[file_name] = self.sheets[file_name]
 
         self.right_listbox.bind("<<ListboxSelect>>", self.update_selected_sheets)
+
 
 
 
@@ -171,15 +190,21 @@ class ExcelProcessorApp(ctk.CTk):
         self.selected_files_sheets.clear()  # Limpiar selección previa
 
         for i in selected_sheets:
-            sheet_label = self.right_listbox.get(i)  # Ejemplo: "archivo1.xlsx - Hoja1"
-            file_name, sheet_name = sheet_label.split(" - ")  # Separar archivo y hoja
-            if file_name not in self.selected_files_sheets:
-                self.selected_files_sheets[file_name] = []
-            self.selected_files_sheets[file_name].append(sheet_name)  # Guardar correctamente
+            sheet_label = self.right_listbox.get(i)  # Ejemplo: "archivo1 - Hoja1"
+            file_name_clean, sheet_name = sheet_label.split(" - ")  # Separar archivo y hoja
+            
+            # Volver a agregar la extensión para que coincida con los nombres de archivo reales
+            for file_name in self.files:
+                if file_name.startswith(file_name_clean):  # Comparar sin la extensión
+                    if file_name not in self.selected_files_sheets:
+                        self.selected_files_sheets[file_name] = []
+                    self.selected_files_sheets[file_name].append(sheet_name)
+                    break  # Salimos del bucle al encontrar el archivo correcto
 
         print("Diccionario actualizado:", self.selected_files_sheets)  # 🛠 Depuración
 
         self.load_columns(None)  # Cargar columnas después de actualizar la selección
+
 
 
 

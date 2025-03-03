@@ -53,6 +53,15 @@ class ExcelProcessorApp(ctk.CTk):
         self.column_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=15, font=self.font_style, exportselection=False)
         self.column_listbox.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
 
+        # Botón para mover columna arriba
+        self.btn_up = ctk.CTkButton(self.listbox_frame, text="Subir", command=self.move_column_up)
+        self.btn_up.grid(row=1, column=2, padx=5, pady=2, sticky="ew")  # 📌 Alineado con columnas
+
+        # Botón para mover columna abajo
+        self.btn_down = ctk.CTkButton(self.listbox_frame, text="Bajar", command=self.move_column_down)
+        self.btn_down.grid(row=2, column=2, padx=5, pady=2, sticky="ew")  # 📌 Debajo del otro botón
+
+
         # Opciones de transformación (sin "Eliminar espacios")
         self.transform_var = ctk.StringVar(value="Ninguna")
         self.transform_dropdown = ctk.CTkComboBox(self.frame, values=["Ninguna", "Mayúsculas", "Minúsculas"], variable=self.transform_var)
@@ -87,6 +96,31 @@ class ExcelProcessorApp(ctk.CTk):
         # Vista previa extendida
         self.tree = ctk.CTkTextbox(self.frame, height=300, width=800)
         self.tree.pack(pady=5, padx=5, fill="both", expand=True)
+        
+    def move_column_up(self):
+        selection = self.column_listbox.curselection()
+        if not selection:
+            return
+        for i in selection:
+            if i > 0:  # No mover si está en la primera posición
+                text = self.column_listbox.get(i)
+                self.column_listbox.delete(i)
+                self.column_listbox.insert(i - 1, text)
+                self.column_listbox.selection_set(i - 1)
+
+    def move_column_down(self):
+        selection = self.column_listbox.curselection()
+        if not selection:
+            return
+        for i in reversed(selection):  # Recorremos en orden inverso para evitar desorden
+            if i < self.column_listbox.size() - 1:  # No mover si está en la última posición
+                text = self.column_listbox.get(i)
+                self.column_listbox.delete(i)
+                self.column_listbox.insert(i + 1, text)
+                self.column_listbox.selection_set(i + 1)
+                
+
+
 
     def load_folder(self):
         folder_selected = filedialog.askdirectory()
@@ -116,7 +150,13 @@ class ExcelProcessorApp(ctk.CTk):
 
         print("Ejecutando load_columns...")  # 🛠 Línea de depuración
 
-        for file_name, selected_sheets in self.selected_files_sheets.items():
+        for file_name_clean, selected_sheets in self.selected_files_sheets.items():
+            # Recuperar el nombre de archivo original con su extensión
+            file_name = next((f for f in self.files if f.startswith(file_name_clean)), None)
+            if not file_name:
+                print(f"⚠ No se encontró el archivo real para {file_name_clean}")
+                continue
+
             file_path = os.path.join(self.folder_path, file_name)
 
             for sheet_name in selected_sheets:
@@ -144,22 +184,35 @@ class ExcelProcessorApp(ctk.CTk):
 
 
 
+
     def load_sheets(self, event):
         selected_indices = self.center_listbox.curselection()
-        self.right_listbox.delete(0, 'end')  # ✅ Limpiar la lista de hojas
+        self.right_listbox.delete(0, 'end')  # ✅ Limpiar lista de hojas
 
         self.selected_files_sheets.clear()
 
         for i in selected_indices:
             file_name = self.center_listbox.get(i)
+            file_name_clean = file_name.replace(".xlsx", "").replace(".xls", "")  # ✅ Quitar extensión
+
             if file_name in self.sheets:
                 for sheet in self.sheets[file_name]:
-                    sheet_label = f"{file_name} - {sheet}"  # Agregar el nombre del archivo
-                    self.right_listbox.insert('end', sheet_label)
+                    file_path = os.path.join(self.folder_path, file_name)
+                    
+                    try:
+                        df = pd.read_excel(file_path, sheet_name=sheet)
+                        if df.dropna(how="all").empty:  # ❌ Si la hoja está vacía, la ignoramos
+                            continue
+                        
+                        sheet_label = f"{file_name_clean} - {sheet}"  # ✅ Usar nombre sin extensión
+                        self.right_listbox.insert('end', sheet_label)
+                    except Exception as e:
+                        print(f"Error al leer {sheet} de {file_name}: {e}")
 
                 self.selected_files_sheets[file_name] = self.sheets[file_name]
 
         self.right_listbox.bind("<<ListboxSelect>>", self.update_selected_sheets)
+
 
 
 
@@ -171,15 +224,21 @@ class ExcelProcessorApp(ctk.CTk):
         self.selected_files_sheets.clear()  # Limpiar selección previa
 
         for i in selected_sheets:
-            sheet_label = self.right_listbox.get(i)  # Ejemplo: "archivo1.xlsx - Hoja1"
-            file_name, sheet_name = sheet_label.split(" - ")  # Separar archivo y hoja
-            if file_name not in self.selected_files_sheets:
-                self.selected_files_sheets[file_name] = []
-            self.selected_files_sheets[file_name].append(sheet_name)  # Guardar correctamente
+            sheet_label = self.right_listbox.get(i)  # Ejemplo: "archivo1 - Hoja1"
+            file_name_clean, sheet_name = sheet_label.split(" - ")  # Separar archivo y hoja
+            
+            # Volver a agregar la extensión para que coincida con los nombres de archivo reales
+            for file_name in self.files:
+                if file_name.startswith(file_name_clean):  # Comparar sin la extensión
+                    if file_name not in self.selected_files_sheets:
+                        self.selected_files_sheets[file_name] = []
+                    self.selected_files_sheets[file_name].append(sheet_name)
+                    break  # Salimos del bucle al encontrar el archivo correcto
 
         print("Diccionario actualizado:", self.selected_files_sheets)  # 🛠 Depuración
 
         self.load_columns(None)  # Cargar columnas después de actualizar la selección
+
 
 
 
@@ -212,10 +271,10 @@ class ExcelProcessorApp(ctk.CTk):
             messagebox.showwarning("Sin archivos", "Seleccione una carpeta antes de exportar.")
             return
 
-        selected_indices = self.column_listbox.curselection()
-        selected_columns = [self.column_listbox.get(i) for i in selected_indices]
+        # Obtener columnas en el orden actual del Listbox
+        ordered_columns = [self.column_listbox.get(i) for i in range(self.column_listbox.size())]
 
-        if not selected_columns:
+        if not ordered_columns:
             messagebox.showwarning("Selección inválida", "Seleccione al menos una columna para exportar.")
             return
 
@@ -226,12 +285,10 @@ class ExcelProcessorApp(ctk.CTk):
 
         processed_data = []
         for df in self.dataframes:
-            df = df[selected_columns]
+            df = df[ordered_columns]  # 🔹 Aplicar el orden personalizado del usuario
 
-            # Siempre eliminar espacios extra
+            # Aplicar transformaciones
             df = df.applymap(lambda x: self.remove_extra_spaces(x) if isinstance(x, str) else x)
-
-            # Aplicar transformación según la opción elegida
             if transform_option == "Mayúsculas":
                 df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
             elif transform_option == "Minúsculas":
@@ -249,7 +306,6 @@ class ExcelProcessorApp(ctk.CTk):
 
             if not self.output_path:
                 self.select_output()
-                print(f"Ruta de salida seleccionada: {self.output_path}")
                 if not self.output_path:
                     return
 
@@ -263,6 +319,7 @@ class ExcelProcessorApp(ctk.CTk):
 
             self.progress.set(1.0)
             messagebox.showinfo("Exportación completada", "El archivo se ha guardado correctamente.")
+
 
     def remove_extra_spaces(self, text):
         """Elimina espacios extra dentro del texto (manteniendo separación entre palabras)"""
