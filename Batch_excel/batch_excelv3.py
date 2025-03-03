@@ -67,6 +67,11 @@ class ExcelProcessorApp(ctk.CTk):
         # Botón para seleccionar/deseleccionar todas las hojas
         self.btn_select_all_sheets = ctk.CTkButton(self.frame, text="Seleccionar Todo", command=self.toggle_select_all_sheets)
         self.btn_select_all_sheets.place(x=420, y=280)  # 📌 Ajusta X e Y según sea necesario
+        
+        # Botón para seleccionar/deseleccionar todos los archivos
+        self.btn_select_all_files = ctk.CTkButton(self.frame, text="Seleccionar Todo", command=self.toggle_select_all_files)
+        self.btn_select_all_files.place(x=100, y=280)  # 📌 Ajusta X e Y para que quede bien alineado
+
 
 
         # Opciones de transformación (sin "Eliminar espacios")
@@ -142,6 +147,21 @@ class ExcelProcessorApp(ctk.CTk):
                 self.column_listbox.delete(i)
                 self.column_listbox.insert(i + 1, text)
                 self.column_listbox.selection_set(i + 1)
+
+    def toggle_select_all_files(self):
+        total_items = self.center_listbox.size()  # Número total de archivos
+        selected_items = self.center_listbox.curselection()  # Archivos actualmente seleccionados
+
+        if len(selected_items) == total_items:  # Si todos están seleccionados, los deseleccionamos
+            self.center_listbox.selection_clear(0, "end")
+            self.btn_select_all_files.configure(text="Seleccionar Todo")
+        else:  # Si no, seleccionamos todos
+            self.center_listbox.selection_set(0, "end")
+            self.btn_select_all_files.configure(text="Deseleccionar Todo")
+
+        # 📌 Usamos after() para que no bloquee la interfaz al actualizar las hojas
+        self.after(100, lambda: self.load_sheets(None))
+
 
     def toggle_select_all(self):
         total_items = self.column_listbox.size()  # Número total de columnas
