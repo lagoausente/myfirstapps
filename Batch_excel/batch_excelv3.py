@@ -61,6 +61,13 @@ class ExcelProcessorApp(ctk.CTk):
         self.btn_down = ctk.CTkButton(self.listbox_frame, text="Bajar", command=self.move_column_down)
         self.btn_down.grid(row=2, column=2, padx=5, pady=2, sticky="ew")  # 📌 Debajo del otro botón
 
+        # Botón para seleccionar/deseleccionar todas las columnas (mismo frame que "Seleccionar Carpeta")
+        self.btn_select_all = ctk.CTkButton(self.frame, text="Seleccionar Todo", command=self.toggle_select_all)
+        self.btn_select_all.place(x=690, y=30)  # 📌 Ajusta los valores X e Y según sea necesario
+        # Botón para seleccionar/deseleccionar todas las hojas
+        self.btn_select_all_sheets = ctk.CTkButton(self.frame, text="Seleccionar Todo", command=self.toggle_select_all_sheets)
+        self.btn_select_all_sheets.place(x=420, y=280)  # 📌 Ajusta X e Y según sea necesario
+
 
         # Opciones de transformación (sin "Eliminar espacios")
         self.transform_var = ctk.StringVar(value="Ninguna")
@@ -96,6 +103,23 @@ class ExcelProcessorApp(ctk.CTk):
         # Vista previa extendida
         self.tree = ctk.CTkTextbox(self.frame, height=300, width=800)
         self.tree.pack(pady=5, padx=5, fill="both", expand=True)
+
+    def toggle_select_all_sheets(self):
+        total_items = self.right_listbox.size()
+        selected_items = self.right_listbox.curselection()
+
+        if len(selected_items) == total_items:  # Si todas están seleccionadas, deseleccionar
+            self.right_listbox.selection_clear(0, "end")
+            self.btn_select_all_sheets.configure(text="Seleccionar Todo")
+        else:  # Seleccionar todas sin sobrecargar la interfaz
+            self.right_listbox.selection_set(0, "end")
+            self.btn_select_all_sheets.configure(text="Deseleccionar Todo")
+
+        # 📌 Usamos after() para ejecutar update_selected_sheets() sin bloquear la UI
+        self.after(100, lambda: self.update_selected_sheets(None))
+
+
+
         
     def move_column_up(self):
         selection = self.column_listbox.curselection()
@@ -118,6 +142,18 @@ class ExcelProcessorApp(ctk.CTk):
                 self.column_listbox.delete(i)
                 self.column_listbox.insert(i + 1, text)
                 self.column_listbox.selection_set(i + 1)
+
+    def toggle_select_all(self):
+        total_items = self.column_listbox.size()  # Número total de columnas
+        selected_items = self.column_listbox.curselection()  # Columnas actualmente seleccionadas
+
+        if len(selected_items) == total_items:  # Si todas están seleccionadas, las deseleccionamos
+            self.column_listbox.selection_clear(0, "end")
+            self.btn_select_all.configure(text="Seleccionar Todo")
+        else:  # Si no, seleccionamos todas
+            self.column_listbox.selection_set(0, "end")
+            self.btn_select_all.configure(text="Deseleccionar Todo")
+
                 
 
 
@@ -271,10 +307,11 @@ class ExcelProcessorApp(ctk.CTk):
             messagebox.showwarning("Sin archivos", "Seleccione una carpeta antes de exportar.")
             return
 
-        # Obtener columnas en el orden actual del Listbox
-        ordered_columns = [self.column_listbox.get(i) for i in range(self.column_listbox.size())]
+        # 📌 Recuperamos solo las columnas seleccionadas (corrección)
+        selected_indices = self.column_listbox.curselection()  # Obtener índices de selección
+        selected_columns = [self.column_listbox.get(i) for i in selected_indices]  # Obtener nombres de columnas
 
-        if not ordered_columns:
+        if not selected_columns:
             messagebox.showwarning("Selección inválida", "Seleccione al menos una columna para exportar.")
             return
 
@@ -285,7 +322,7 @@ class ExcelProcessorApp(ctk.CTk):
 
         processed_data = []
         for df in self.dataframes:
-            df = df[ordered_columns]  # 🔹 Aplicar el orden personalizado del usuario
+            df = df[selected_columns]  # 📌 Solo exportamos las columnas seleccionadas
 
             # Aplicar transformaciones
             df = df.applymap(lambda x: self.remove_extra_spaces(x) if isinstance(x, str) else x)
@@ -319,6 +356,7 @@ class ExcelProcessorApp(ctk.CTk):
 
             self.progress.set(1.0)
             messagebox.showinfo("Exportación completada", "El archivo se ha guardado correctamente.")
+
 
 
     def remove_extra_spaces(self, text):

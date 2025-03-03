@@ -53,6 +53,22 @@ class ExcelProcessorApp(ctk.CTk):
         self.column_listbox = Listbox(self.listbox_frame, selectmode=MULTIPLE, height=10, width=15, font=self.font_style, exportselection=False)
         self.column_listbox.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
 
+        # Botón para mover columna arriba
+        self.btn_up = ctk.CTkButton(self.listbox_frame, text="Subir", command=self.move_column_up)
+        self.btn_up.grid(row=1, column=2, padx=5, pady=2, sticky="ew")  # 📌 Alineado con columnas
+
+        # Botón para mover columna abajo
+        self.btn_down = ctk.CTkButton(self.listbox_frame, text="Bajar", command=self.move_column_down)
+        self.btn_down.grid(row=2, column=2, padx=5, pady=2, sticky="ew")  # 📌 Debajo del otro botón
+
+        # Botón para seleccionar/deseleccionar todas las columnas (mismo frame que "Seleccionar Carpeta")
+        self.btn_select_all = ctk.CTkButton(self.frame, text="Seleccionar Todo", command=self.toggle_select_all)
+        self.btn_select_all.place(x=690, y=30)  # 📌 Ajusta los valores X e Y según sea necesario
+        # Botón para seleccionar/deseleccionar todas las hojas
+        self.btn_select_all_sheets = ctk.CTkButton(self.frame, text="Seleccionar Todo", command=self.toggle_select_all_sheets)
+        self.btn_select_all_sheets.place(x=420, y=280)  # 📌 Ajusta X e Y según sea necesario
+
+
         # Opciones de transformación (sin "Eliminar espacios")
         self.transform_var = ctk.StringVar(value="Ninguna")
         self.transform_dropdown = ctk.CTkComboBox(self.frame, values=["Ninguna", "Mayúsculas", "Minúsculas"], variable=self.transform_var)
@@ -87,6 +103,60 @@ class ExcelProcessorApp(ctk.CTk):
         # Vista previa extendida
         self.tree = ctk.CTkTextbox(self.frame, height=300, width=800)
         self.tree.pack(pady=5, padx=5, fill="both", expand=True)
+
+    def toggle_select_all_sheets(self):
+        total_items = self.right_listbox.size()
+        selected_items = self.right_listbox.curselection()
+
+        if len(selected_items) == total_items:  # Si todas están seleccionadas, deseleccionar
+            self.right_listbox.selection_clear(0, "end")
+            self.btn_select_all_sheets.configure(text="Seleccionar Todo")
+        else:  # Seleccionar todas sin sobrecargar la interfaz
+            self.right_listbox.selection_set(0, "end")
+            self.btn_select_all_sheets.configure(text="Deseleccionar Todo")
+
+        # 📌 Usamos after() para ejecutar update_selected_sheets() sin bloquear la UI
+        self.after(100, lambda: self.update_selected_sheets(None))
+
+
+
+        
+    def move_column_up(self):
+        selection = self.column_listbox.curselection()
+        if not selection:
+            return
+        for i in selection:
+            if i > 0:  # No mover si está en la primera posición
+                text = self.column_listbox.get(i)
+                self.column_listbox.delete(i)
+                self.column_listbox.insert(i - 1, text)
+                self.column_listbox.selection_set(i - 1)
+
+    def move_column_down(self):
+        selection = self.column_listbox.curselection()
+        if not selection:
+            return
+        for i in reversed(selection):  # Recorremos en orden inverso para evitar desorden
+            if i < self.column_listbox.size() - 1:  # No mover si está en la última posición
+                text = self.column_listbox.get(i)
+                self.column_listbox.delete(i)
+                self.column_listbox.insert(i + 1, text)
+                self.column_listbox.selection_set(i + 1)
+
+    def toggle_select_all(self):
+        total_items = self.column_listbox.size()  # Número total de columnas
+        selected_items = self.column_listbox.curselection()  # Columnas actualmente seleccionadas
+
+        if len(selected_items) == total_items:  # Si todas están seleccionadas, las deseleccionamos
+            self.column_listbox.selection_clear(0, "end")
+            self.btn_select_all.configure(text="Seleccionar Todo")
+        else:  # Si no, seleccionamos todas
+            self.column_listbox.selection_set(0, "end")
+            self.btn_select_all.configure(text="Deseleccionar Todo")
+
+                
+
+
 
     def load_folder(self):
         folder_selected = filedialog.askdirectory()
@@ -237,8 +307,9 @@ class ExcelProcessorApp(ctk.CTk):
             messagebox.showwarning("Sin archivos", "Seleccione una carpeta antes de exportar.")
             return
 
-        selected_indices = self.column_listbox.curselection()
-        selected_columns = [self.column_listbox.get(i) for i in selected_indices]
+        # 📌 Recuperamos solo las columnas seleccionadas (corrección)
+        selected_indices = self.column_listbox.curselection()  # Obtener índices de selección
+        selected_columns = [self.column_listbox.get(i) for i in selected_indices]  # Obtener nombres de columnas
 
         if not selected_columns:
             messagebox.showwarning("Selección inválida", "Seleccione al menos una columna para exportar.")
@@ -251,12 +322,10 @@ class ExcelProcessorApp(ctk.CTk):
 
         processed_data = []
         for df in self.dataframes:
-            df = df[selected_columns]
+            df = df[selected_columns]  # 📌 Solo exportamos las columnas seleccionadas
 
-            # Siempre eliminar espacios extra
+            # Aplicar transformaciones
             df = df.applymap(lambda x: self.remove_extra_spaces(x) if isinstance(x, str) else x)
-
-            # Aplicar transformación según la opción elegida
             if transform_option == "Mayúsculas":
                 df = df.applymap(lambda x: x.upper() if isinstance(x, str) else x)
             elif transform_option == "Minúsculas":
@@ -274,7 +343,6 @@ class ExcelProcessorApp(ctk.CTk):
 
             if not self.output_path:
                 self.select_output()
-                print(f"Ruta de salida seleccionada: {self.output_path}")
                 if not self.output_path:
                     return
 
@@ -288,6 +356,8 @@ class ExcelProcessorApp(ctk.CTk):
 
             self.progress.set(1.0)
             messagebox.showinfo("Exportación completada", "El archivo se ha guardado correctamente.")
+
+
 
     def remove_extra_spaces(self, text):
         """Elimina espacios extra dentro del texto (manteniendo separación entre palabras)"""
